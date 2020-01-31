@@ -61,6 +61,15 @@ uniquedf = datadf.drop_duplicates(subset=['Latitude_deg_', 'Longitude_deg_'])
 uniquedf.loc[:,['Latitude_deg_', 'Longitude_deg_', 'Elevation']].to_csv('unique_points.csv', index=False)
 
 #%%
+#####################################################################
+#####                                                           #####
+#####   Merging der STRM3-Daten und anderer Daten mit den       #####
+#####   EV-Profilen                                             #####
+#####                                                           #####
+#####   Author:      David Rößler (2020)                        #####
+#####   Last edited:    01/27/2020                              #####
+#####                                                           #####
+#####################################################################
 datadf = pd.read_csv('merged_data_ev_only.csv')
 datadf =  datadf.rename(columns=dict([(c, c.replace('[', '_').replace(']', '_')) for c in datadf.columns]))
 # https://librenepal.com/article/reading-srtm-data-with-python/
@@ -77,7 +86,22 @@ lon_row = np.round((y - np.floor(y)) * (SAMPLES - 1), 0).astype(int)
 
 datadf['Elevation'] = elevations[(SAMPLES - 1 - lat_row).tolist(), lon_row.tolist()].astype(int)
 
-
 datadf.to_csv('data_ev_only_elevation.csv', index=False)
 uniquedf = datadf.drop_duplicates(subset=['Latitude_deg_', 'Longitude_deg_'])
 uniquedf.loc[:,['Latitude_deg_', 'Longitude_deg_', 'Elevation']].to_csv('unique_points.csv', index=False)
+# %%
+import requests
+import datetime as dt
+
+base_url = 'https://www.ncei.noaa.gov/access/services/data/v1'
+parameters = {
+    'dataset' : 'daily-summaries',
+    'startDate' : pd.to_timedelta(datadf['DayNum'], unit='d') + dt.datetime.strptime('2017-11-01', '%Y-%m-%d'),
+    'endDate' : pd.to_timedelta(datadf['DayNum'], unit='d') + dt.datetime.strptime('2018-11-14', '%Y-%m-%d'),
+    'format' : 'csv',
+    'units' : 'metric'
+
+}
+result = requests.get(base_url, parameters)
+#%%
+print(result.status_code)
