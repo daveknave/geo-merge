@@ -101,5 +101,5 @@ datadf.to_csv('data_ev_only_elevation_incl_ws.csv', index=False)
 #%%
 # https://kilthub.cmu.edu/articles/Compiled_daily_temperature_and_precipitation_data_for_the_U_S_cities/7890488
 datadf = pd.read_csv('data_ev_only_elevation_incl_ws.csv')
-for ws in datadf['StID'].unique().tolist():
-    weatherdf = pd.read_csv('7890488/' + ws + '.csv')
+for ws in [datadf['StID'].unique().tolist()[0]]:
+    weatherdf = pd.read_csv('7890488/' + str(ws) + '.csv')
