@@ -8,17 +8,15 @@
 #####                                                           #####
 #####################################################################
 import pandas as pd
-import georasters as gr
-import geopandas as geopd
 import os
 import numpy as np
 import requests
 import datetime as dt
 
 ### Daten https://arxiv.org/abs/1905.02081
-os.chdir('/home/daveknave/PycharmProjects/geomerge/data')
+os.chdir('/home/daveknave/PycharmProjects/geo-merge/data')
 from sklearn.metrics.pairwise import haversine_distances
-# import haversine
+import haversine
 #%%
 stationsdf = pd.read_csv('7890488/city_info.csv', parse_dates=[4, 5], infer_datetime_format=True, index_col=0)
 stationsdf['Stn.edDate'] = pd.to_datetime(stationsdf['Stn.edDate'], format='%Y-%m-%d')
@@ -75,10 +73,9 @@ def kantenmodell(d):
     )
     dist_matrix = haversine_distances(concated[['Latitude_deg__from', 'Longitude_deg__from']], concated[['Latitude_deg__to', 'Longitude_deg__to']]) * 6371000/1000
     d['distance'] = [dist_matrix[i,i] for i in range(dist_matrix.shape[0]) if i < dist_matrix.shape[1] - 1] + [np.nan]
-    print(dist_matrix)
     return d
 
-complete = datadf.head(10000).groupby(['Trip'], as_index=False).apply(lambda y: kantenmodell(y))
+complete = datadf.groupby(['Trip'], as_index=False).apply(lambda y: kantenmodell(y))
 ['DayNum', 'VehId', 'Trip', 'Timestamp(ms)', 'Latitude_deg_',
        'Longitude_deg_', 'Vehicle Speed_km/h_', 'MAF_g/sec_',
        'Engine RPM_RPM_', 'Absolute Load_%_', 'OAT_DegC_', 'Fuel Rate_L/hr_',
@@ -109,3 +106,44 @@ complete = complete.drop(columns=[
     'Short Term Fuel Trim Bank 2_%_', 'Long Term Fuel Trim Bank 1_%_',
     'Long Term Fuel Trim Bank 2_%_', 'lat', 'lon',
 ]).rename(columns=renames)
+
+complete.to_csv('data_ev_complete_weather_edges.csv', index=False)
+#%%
+
+#%%
+complete = pd.read_csv('data_ev_complete_weather_edges.csv').drop_duplicates()
+complete['motion_idx'] = 0
+last_loc_change_idx = 0
+last_trip = 0
+new_block = False
+for ridx, ro in complete.iterrows():
+    if ro['Trip'] != last_trip: ### Neuer Trip startet automatisch einen neuen Laufindex
+        last_trip = ro['Trip']
+        last_loc_change_idx = ridx
+
+
+    if new_block:
+        last_loc_change_idx = ridx
+        new_block = False
+
+
+    complete.loc[ridx,'motion_idx'] = last_loc_change_idx
+
+    if ro['distance'] > 0:
+        new_block = True
+
+#%%
+def aggregate_motion(d):
+    x = {
+        'speed' : d['speed'].mean(),
+        'distance' : d['distance'].max(),
+        'soc_delta': d['soc_delta'].sum(),
+        'elev_delta': d['elev_delta'].sum(),
+        'hv_current_a': d['hv_current_a'].mean(),
+        'hv_voltage_v': d['hv_voltage_v'].mean()
+
+    }
+    x.update(d.drop(columns=['speed', 'distance', 'soc_delta', 'elev_delta', 'hv_current_a', 'hv_voltage_v']).iloc[-1].to_dict())
+    return pd.Series(data=x)
+final_aggregate_rows = complete.groupby('motion_idx').apply(lambda d: aggregate_motion(d))
+final_aggregate_rows.to_csv('final_aggregate_rows.csv', index=False)
