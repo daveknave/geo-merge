@@ -12,9 +12,8 @@ import os
 import numpy as np
 import requests
 import datetime as dt
-
 ### Daten https://arxiv.org/abs/1905.02081
-os.chdir('/home/daveknave/PycharmProjects/geo-merge/data')
+os.chdir('/home/daveknave/PycharmProjects/geomerge/data')
 from sklearn.metrics.pairwise import haversine_distances
 import haversine
 #%%
@@ -131,8 +130,9 @@ for ridx, ro in complete.iterrows():
 
     if ro['distance'] > 0:
         new_block = True
-
+complete.to_csv('data_ev_complete_weather_edges_moidx.csv', index=False)
 #%%
+complete = pd.read_csv('data_ev_complete_weather_edges_moidx.csv')
 def aggregate_motion(d):
     x = {
         'speed' : d['speed'].mean(),
@@ -141,9 +141,18 @@ def aggregate_motion(d):
         'elev_delta': d['elev_delta'].sum(),
         'hv_current_a': d['hv_current_a'].mean(),
         'hv_voltage_v': d['hv_voltage_v'].mean()
-
     }
     x.update(d.drop(columns=['speed', 'distance', 'soc_delta', 'elev_delta', 'hv_current_a', 'hv_voltage_v']).iloc[-1].to_dict())
+    speed_corr = d.reset_index().corr(['index', 'speed'])
+    print(speed_corr)
+    if speed_corr > 0:
+        x['accel'] = 1
+    elif speed_corr < 0:
+        x['accel'] = -1
+    else:
+        x['accel'] = 0
+
+
     return pd.Series(data=x)
-final_aggregate_rows = complete.groupby('motion_idx').apply(lambda d: aggregate_motion(d))
+final_aggregate_rows = complete.head(3000).groupby('motion_idx', as_index=False).apply(lambda d: aggregate_motion(d))
 final_aggregate_rows.to_csv('final_aggregate_rows.csv', index=False)
