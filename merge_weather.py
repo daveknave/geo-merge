@@ -13,7 +13,7 @@ import numpy as np
 import requests
 import datetime as dt
 ### Daten https://arxiv.org/abs/1905.02081
-os.chdir('/home/daveknave/PycharmProjects/geo-merge/data')
+os.chdir('/home/daveknave/PycharmProjects/geomerge/data')
 from sklearn.metrics.pairwise import haversine_distances
 from sklearn.linear_model import LinearRegression
 import haversine
