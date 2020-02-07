@@ -13,8 +13,9 @@ import numpy as np
 import requests
 import datetime as dt
 ### Daten https://arxiv.org/abs/1905.02081
-os.chdir('/home/daveknave/PycharmProjects/geomerge/data')
+os.chdir('/home/daveknave/PycharmProjects/geo-merge/data')
 from sklearn.metrics.pairwise import haversine_distances
+from sklearn.linear_model import LinearRegression
 import haversine
 #%%
 stationsdf = pd.read_csv('7890488/city_info.csv', parse_dates=[4, 5], infer_datetime_format=True, index_col=0)
@@ -140,19 +141,17 @@ def aggregate_motion(d):
         'soc_delta': d['soc_delta'].sum(),
         'elev_delta': d['elev_delta'].sum(),
         'hv_current_a': d['hv_current_a'].mean(),
-        'hv_voltage_v': d['hv_voltage_v'].mean()
+        'hv_voltage_v': d['hv_voltage_v'].mean(),
+        'speed': d['speed'].iloc[0]
     }
-    x.update(d.drop(columns=['speed', 'distance', 'soc_delta', 'elev_delta', 'hv_current_a', 'hv_voltage_v']).iloc[-1].to_dict())
-    speed_corr = d.reset_index().corr(['index', 'speed'])
-    print(speed_corr)
-    if speed_corr > 0:
-        x['accel'] = 1
-    elif speed_corr < 0:
-        x['accel'] = -1
-    else:
-        x['accel'] = 0
+    x.update(d.drop(columns=['distance', 'soc_delta', 'elev_delta', 'hv_current_a', 'hv_voltage_v']).iloc[-1].to_dict())
+
+    lr_model = LinearRegression(fit_intercept=False)
+    lr_model.fit(d[['speed']], d.reset_index(drop=True).reset_index()[['index']])
+
+    x['accel'] = lr_model.coef_[0][0]
 
 
     return pd.Series(data=x)
-final_aggregate_rows = complete.head(3000).groupby('motion_idx', as_index=False).apply(lambda d: aggregate_motion(d))
+final_aggregate_rows = complete.groupby('motion_idx', as_index=False).apply(lambda d: aggregate_motion(d))
 final_aggregate_rows.to_csv('final_aggregate_rows.csv', index=False)
